@@ -1,4 +1,4 @@
-﻿import { deepseek } from '@/lib/deepseek';
+﻿import llm from '@/lib/llm';
 import { NextRequest } from 'next/server';
 import { SYSTEM_ROLES } from '@/lib/roles';
 
@@ -9,12 +9,9 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const {
             messages,
-            model = 'deepseek-chat',
-            temperature = 0.7,
             system_prompt = SYSTEM_ROLES[0].prompt,
         } = body;
 
-        // 验证消息
         if (!messages || !Array.isArray(messages) || messages.length === 0) {
             return new Response(
                 JSON.stringify({ error: 'Messages are required' }),
@@ -30,20 +27,14 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        if (!process.env.DEEPSEEK_API_KEY) {
+        if (!llm.isKeyConfigured()) {
             return new Response(
                 JSON.stringify({ error: 'API key is not configured' }),
                 { status: 500, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
-        const stream = await deepseek.chat.completions.create({
-            model,
-            messages: allMessages,
-            temperature: Math.max(0.1, Math.min(2.0, temperature)),
-            max_tokens: 2048,
-            stream: true,
-        });
+        const stream = await llm.createStream(allMessages);
 
         const encoder = new TextEncoder();
 
