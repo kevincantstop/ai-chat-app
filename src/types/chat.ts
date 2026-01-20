@@ -9,3 +9,13 @@ export interface ChatRequest {
     temperature?: number;
     system_prompt?: string;
 }
+
+export interface Message {
+    id: string;
+    content: string;
+    role: 'user' | 'assistant';
+    liked?: boolean;
+    disliked?: boolean;
+    copied?: boolean;
+    timestamp: Date;
+}

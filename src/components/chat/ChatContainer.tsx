@@ -16,30 +16,15 @@ import {
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { motion, AnimatePresence } from 'framer-motion'
-import { SYSTEM_ROLES } from '@/lib/roles'
-
-interface Message {
-    id: string
-    content: string
-    role: 'user' | 'assistant'
-    liked?: boolean
-    disliked?: boolean
-    copied?: boolean
-    timestamp: Date
-}
-
-const DEFAULT_ROLE = 'system';
-const DEFAULT_MODEL = 'deepseek-chat';
+import useMessageStore from "@/store/message-store";
 
 export default function ChatContainer({}) {
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: '1',
-            content: 'Hello! I\'m an AI assistant. What would you like to discuss?',
-            role: 'assistant',
-            timestamp: new Date(),
-        },
-    ])
+    const messages = useMessageStore(state => state.messages);
+    const sendMessage = useMessageStore(state => state.sendMessage);
+    const clearMessage = useMessageStore(state => state.clearMessages);
+    const likeMessage = useMessageStore(state => state.likeMessage);
+    const dislikeMessage = useMessageStore(state => state.dislikeMessage);
+    const copyMessage = useMessageStore(state => state.copyMessage);
 
     const [input, setInput] = useState('')
     const [isLoading, setIsLoading] = useState(false)
@@ -53,149 +38,36 @@ export default function ChatContainer({}) {
         e.preventDefault()
         if (!input.trim() || isLoading) return
 
-        const userMessage: Message = {
-            id: Date.now().toString(),
-            content: input,
-            role: 'user',
-            timestamp: new Date(),
-        }
-        setMessages(prev => [...prev, userMessage])
         setInput('')
         setIsLoading(true)
 
-        // 添加AI消息占位符
-        const aiMessageId = (Date.now() + 1).toString()
-        setMessages(prev => [...prev, {
-            id: aiMessageId,
-            content: '',
-            role: 'assistant',
-            timestamp: new Date(),
-        }])
-
-        try {
-            // 准备消息
-            const allMessages = messages.map(msg => ({
-                role: msg.role,
-                content: msg.content
-            }))
-            allMessages.push({ role: 'user', content: input })
-
-            const selectedRole = SYSTEM_ROLES.find(r => r.id === DEFAULT_ROLE)
-
-            // 发送请求
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    messages: allMessages,
-                    DEFAULT_MODEL,
-                    system_prompt: selectedRole?.prompt,
-                }),
-            })
-
-            if (!response.ok) {
-                throw new Error('Failed to get response')
-            }
-
-            if (!response.body) {
-                throw new Error('Response body is empty')
-            }
-
-            // 处理流式响应
-            const reader = response.body.getReader()
-            const decoder = new TextDecoder()
-            let content = ''
-
-            while (true) {
-                const { done, value } = await reader.read()
-
-                if (done) {
-                    break
-                }
-
-                const chunk = decoder.decode(value)
-                content += chunk
-
-                // 更新消息内容
-                setMessages(prev => prev.map(msg =>
-                    msg.id === aiMessageId
-                        ? { ...msg, content }
-                        : msg
-                ))
-            }
-
-        } catch (error) {
-            console.error('Error:', error)
-            setMessages(prev => prev.map(msg =>
-                msg.id === aiMessageId
-                    ? { ...msg, content: 'Sorry, an error occurred. Please try again.' }
-                    : msg
-            ))
-        } finally {
-            setIsLoading(false)
-        }
+        sendMessage(input, () => {
+            setIsLoading(false);
+        })
     }
 
     const handleCopy = (messageId: string, text: string) => {
-        navigator.clipboard.writeText(text)
-        setMessages(prev => prev.map(msg =>
-            msg.id === messageId ? { ...msg, copied: true } : msg
-        ))
-        setTimeout(() => {
-            setMessages(prev => prev.map(msg =>
-                msg.id === messageId ? { ...msg, copied: false } : msg
-            ))
-        }, 2000)
+        navigator.clipboard.writeText(text);
+        copyMessage(messageId);
     }
 
     const handleLike = (messageId: string) => {
-        setMessages(prev => prev.map(msg => {
-            if (msg.id === messageId) {
-                const newLiked = !msg.liked
-                return {
-                    ...msg,
-                    liked: newLiked,
-                    disliked: newLiked ? false : msg.disliked
-                }
-            }
-            return msg
-        }))
+        likeMessage(messageId);
     }
 
     const handleDislike = (messageId: string) => {
-        setMessages(prev => prev.map(msg => {
-            if (msg.id === messageId) {
-                const newDisliked = !msg.disliked
-                return {
-                    ...msg,
-                    disliked: newDisliked,
-                    liked: newDisliked ? false : msg.liked
-                }
-            }
-            return msg
-        }))
+        dislikeMessage(messageId);
     }
 
     const clearChat = () => {
-        setMessages([
-            {
-                id: '1',
-                content: 'Chat history cleared. How can I assist you?',
-                role: 'assistant',
-                timestamp: new Date(),
-            },
-        ])
+        clearMessage('Chat history cleared. How can I assist you?');
     }
 
-    const formatTime = (date: Date) => {
-        return date.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-        })
-    }
+    const formatTime = (date: Date) => date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    })
 
     return (
         <div className="flex flex-col h-screen bg-gray-900 text-gray-100">
