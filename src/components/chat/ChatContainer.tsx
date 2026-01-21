@@ -16,6 +16,7 @@ import {
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 import useMessageStore from "@/store/message-store";
 
 export default function ChatContainer({}) {
@@ -49,6 +50,7 @@ export default function ChatContainer({}) {
     const handleCopy = (messageId: string, text: string) => {
         navigator.clipboard.writeText(text);
         copyMessage(messageId);
+        toast.success('Copied!');
     }
 
     const handleLike = (messageId: string) => {
